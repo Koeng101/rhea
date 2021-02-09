@@ -1,38 +1,18 @@
 package rhea
 
 import (
-	"compress/gzip"
-	"encoding/xml"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 )
 
 func TestParse(t *testing.T) {
-	xmlFile, err := os.Open("data/rhea.rdf.gz")
+	rheaBytes, err := ReadRhea("data/rhea.rdf.gz")
 	if err != nil {
-		t.Errorf("%w", err)
+		t.Errorf("Failed to ReadRhea. Got error: %w", err)
 	}
-	r, err := gzip.NewReader(xmlFile)
+	rhea, err := ParseRhea(rheaBytes)
 	if err != nil {
-		t.Errorf("%w", err)
+		t.Errorf("Failed to ParseRhea. Got error: %w", err)
 	}
-	rheaBytes, err := ioutil.ReadAll(r)
-	if err != nil {
-		t.Errorf("%w", err)
-	}
-
-	var rdf RheaRdf
-	err = xml.Unmarshal(rheaBytes, &rdf)
-	if err != nil {
-		t.Errorf("%w", err)
-	}
-	fmt.Println(rdf.XMLName)
-	for _, description := range rdf.Descriptions {
-		if len(description.ContainsX) != 0 {
-			fmt.Println(description.ContainsX)
-		}
-
-	}
+	fmt.Println(rhea.ReactionSides)
 }
