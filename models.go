@@ -207,60 +207,56 @@ These structs are what you would put into a database or directly use. In order t
 create a tree or insert into a normalized database, you would insert in the following
 order:
 
-	- Chebi
-	- SmallMolecule
-	- GenericCompound
-	- Polymer
-	- ReactionSide
+	- ReactivePart
+	- ReactiveSide (derived from ReactionParticipant/Reaction)
+	- ReactionParticipant
 	- Reaction
 
-Relationally, the entire structure of Rhea can simply be thought of as:
+The entire structure of Rhea can simply be thought of as:
 
-	- Human readable REACTIONS exist, associated with ec numbers (and Uniprot identifiers)
-	- REACTIONS have two SIDES of their equation: a left side, and a right side.
-	- Each SIDE of an equation contains a variable number of POLYMERS, GENERIC COMPOUNDS, OR SMALL MOLECULES
-	- Each POLYMER, GENERIC COMPOUND, OR SMALL MOLECULE is associated with a CHEBI
-	- A CHEBI represents an underlying chemical
+	- There are Reactions. Those Reactions can have substrates and products, or substratesOrProducts
+	  in the case that the reaction is bidirectional.
+	- There are ReactionSides. ReactionSides can be thought of as a many-to-many table between Reactions
+	  and ReactionParticipants. It only serves as an inbetween, saying "this Reaction has these
+	  ReactionParticipants on this side"
+	- There are ReactionParticipants. ReactionParticipants link ReactionSides with ReactiveParts and include
+	  useful information like the number of ReactiveParts (or chemicals) needed to do a certain Reaction.
+	- There are ReactiveParts. These are molecules.
 
 ******************************************************************************/
 
 type Rhea struct {
-	ReactiveParts []ReactivePart
-	Compounds     []Compound
-	ReactionSides []ReactionSide
-	Reactions     []Reaction
+	ReactionParticipants []ReactionParticipant `json:"reactionParticipants"`
+	ReactiveParts        []ReactivePart        `json:"reactiveParts"`
+	Reactions            []Reaction            `json:"reactions"`
 }
 
 type ReactivePart struct {
-	// Small Molecule portions
-	Id                  int
-	Accession           string
-	Position            string
-	Name                string
-	HtmlName            string
-	Formula             string
-	Charge              string
-	Chebi               string
-	SubclassOfChebi     string
-	PolymerizationIndex string
+	Id                  int    `json:"id"`
+	Accession           string `json:"accession"`
+	Position            string `json:"position"`
+	Name                string `json:"name"`
+	HtmlName            string `json:"htmlName"`
+	Formula             string `json:"formula"`
+	Charge              string `json:"charge"`
+	Chebi               string `json:"chebi"`
+	SubclassOfChebi     string `json:"subclassOfChebi"`
+	PolymerizationIndex string `json:"polymerizationIndex"`
+
+	CompoundId        int    `json:"id"`
+	CompoundAccession string `json:"accession"`
+	CompoundName      string `json:"name"`
+	CompoundHtmlName  string `json:"htmlName"`
+	CompoundType      string `json:"compoundType"`
 }
 
-type Compound struct {
-	Id           int
-	Accession    string
-	Name         string
-	HtmlName     string
-	CompoundType string // SmallMolecule, Polymer, GenericPolypeptide, GenericPolynucleotide, GenericHeteropolysaccharide
-	ReactivePart string
-}
-
-type ReactionSide struct {
-	Accession string
-	Contains  int
-	ContainsN bool
-	Minus     bool // Only set to true if ContainsN == true to handle Nminus1
-	Plus      bool // Only set to true if ContainsN == true to handle Nplus1
-	Compound  string
+type ReactionParticipant struct {
+	ReactionSide string `json:"reactionside"`
+	Contains     int    `json:"contains"`
+	ContainsN    bool   `json:"containsn"`
+	Minus        bool   `json:"minus"` // Only set to true if ContainsN == true to handle Nminus1
+	Plus         bool   `json:"plus"`  // Only set to true if ContainsN == true to handle Nplus1
+	Compound     string `json:"compound"`
 }
 
 type Reaction struct {
@@ -301,6 +297,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 
 	// Initialize Rhea
 	var rhea Rhea
+	compoundMap := make(map[string]ReactivePart)
 
 	for _, description := range rdf.Descriptions {
 		for _, subclass := range description.Subclass {
@@ -351,7 +348,13 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					HtmlName:  description.HtmlName,
 					Formula:   description.Formula,
 					Charge:    description.Charge,
-					Chebi:     description.Chebi.Resource}
+					Chebi:     description.Chebi.Resource,
+
+					CompoundId:        description.Id,
+					CompoundAccession: description.Accession,
+					CompoundName:      description.Name,
+					CompoundHtmlName:  description.HtmlName,
+					CompoundType:      compoundType}
 				if compoundType == "Polymer" {
 					newReactivePart.Chebi = description.UnderlyingChebi.Resource
 				}
@@ -361,37 +364,27 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						newReactivePart.SubclassOfChebi = sc.Resource
 					}
 				}
-				newCompound := Compound{
-					Id:           description.Id,
-					Accession:    description.Accession,
-					Name:         description.Name,
-					HtmlName:     description.HtmlName,
-					CompoundType: compoundType,
-					ReactivePart: description.Accession}
-
 				// Add new reactive parts and new compounds to rhea
 				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
-				rhea.Compounds = append(rhea.Compounds, newCompound)
 			case "http://rdf.rhea-db.org/GenericPolypeptide", "http://rdf.rhea-db.org/GenericPolynucleotide", "http://rdf.rhea-db.org/GenericHeteropolysaccharide":
 				compoundType := subclass.Resource[23:]
-				newCompound := Compound{
-					Id:           description.Id,
-					Accession:    description.Accession,
-					Name:         description.Name,
-					HtmlName:     description.HtmlName,
-					CompoundType: compoundType,
-					ReactivePart: description.ReactivePartXml.Resource}
-				rhea.Compounds = append(rhea.Compounds, newCompound)
-			case "http://rdf.rhea-db.org/ReactivePart":
 				newReactivePart := ReactivePart{
-					Id:        description.Id,
-					Accession: description.Accession,
-					Position:  description.Position,
-					Name:      description.Name,
-					HtmlName:  description.HtmlName,
-					Formula:   description.Formula,
-					Charge:    description.Charge,
-					Chebi:     description.Chebi.Resource}
+					CompoundId:        description.Id,
+					CompoundAccession: description.Accession,
+					CompoundName:      description.Name,
+					CompoundHtmlName:  description.HtmlName,
+					CompoundType:      compoundType}
+				compoundMap[description.ReactivePartXml.Resource] = newReactivePart
+			case "http://rdf.rhea-db.org/ReactivePart":
+				newReactivePart := compoundMap[description.Accession]
+				newReactivePart.Id = description.Id
+				newReactivePart.Accession = description.Accession
+				newReactivePart.Position = description.Position
+				newReactivePart.Name = description.Name
+				newReactivePart.HtmlName = description.HtmlName
+				newReactivePart.Formula = description.Formula
+				newReactivePart.Charge = description.Charge
+				newReactivePart.Chebi = description.Chebi.Resource
 				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
 			}
 		}
@@ -400,54 +393,54 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				// Get reaction sides
 				// gzip -d -k -c rhea.rdf.gz | grep -o -P '(?<=contains).*(?= rdf)' | tr ' ' '\n' | sort -u | tr '\n' ' '
 				// The exceptions to numeric contains are 2n, N, Nminus1, and Nplus1
-				var newReactionSide ReactionSide
+				var newReactionParticipant ReactionParticipant
 				switch containsx.XMLName.Local {
 				case "containsN":
-					newReactionSide = ReactionSide{
-						Accession: description.About,
-						Contains:  1,
-						ContainsN: true,
-						Minus:     false,
-						Plus:      false,
-						Compound:  containsx.Content}
+					newReactionParticipant = ReactionParticipant{
+						ReactionSide: description.About,
+						Contains:     1,
+						ContainsN:    true,
+						Minus:        false,
+						Plus:         false,
+						Compound:     containsx.Content}
 				case "contains2n":
-					newReactionSide = ReactionSide{
-						Accession: description.About,
-						Contains:  2,
-						ContainsN: true,
-						Minus:     false,
-						Plus:      false,
-						Compound:  containsx.Content}
+					newReactionParticipant = ReactionParticipant{
+						ReactionSide: description.About,
+						Contains:     2,
+						ContainsN:    true,
+						Minus:        false,
+						Plus:         false,
+						Compound:     containsx.Content}
 				case "containsNminus1":
-					newReactionSide = ReactionSide{
-						Accession: description.About,
-						Contains:  1,
-						ContainsN: true,
-						Minus:     true,
-						Plus:      false,
-						Compound:  containsx.Content}
+					newReactionParticipant = ReactionParticipant{
+						ReactionSide: description.About,
+						Contains:     1,
+						ContainsN:    true,
+						Minus:        true,
+						Plus:         false,
+						Compound:     containsx.Content}
 				case "containsNplus1":
-					newReactionSide = ReactionSide{
-						Accession: description.About,
-						Contains:  1,
-						ContainsN: true,
-						Minus:     false,
-						Plus:      true,
-						Compound:  containsx.Content}
+					newReactionParticipant = ReactionParticipant{
+						ReactionSide: description.About,
+						Contains:     1,
+						ContainsN:    true,
+						Minus:        false,
+						Plus:         true,
+						Compound:     containsx.Content}
 				default:
 					i, err := strconv.Atoi(containsx.XMLName.Local[8:])
 					if err != nil {
 						return Rhea{}, err
 					}
-					newReactionSide = ReactionSide{
-						Accession: description.About,
-						Contains:  i,
-						ContainsN: false,
-						Minus:     false,
-						Plus:      false,
-						Compound:  containsx.Content}
+					newReactionParticipant = ReactionParticipant{
+						ReactionSide: description.About,
+						Contains:     i,
+						ContainsN:    false,
+						Minus:        false,
+						Plus:         false,
+						Compound:     containsx.Content}
 				}
-				rhea.ReactionSides = append(rhea.ReactionSides, newReactionSide)
+				rhea.ReactionParticipants = append(rhea.ReactionParticipants, newReactionParticipant)
 			}
 		}
 	}

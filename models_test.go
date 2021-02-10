@@ -14,5 +14,5 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to ParseRhea. Got error: %w", err)
 	}
-	fmt.Println(rhea.ReactionSides)
+	fmt.Println(rhea.ReactiveParts[10:12])
 }
