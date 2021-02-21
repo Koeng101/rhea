@@ -16,8 +16,6 @@ func TestParse(t *testing.T) {
 	}
 	//r := rhea.ReactionParticipants[100].Compound
 	for _, a := range rhea.ReactiveParts {
-		if a.CompoundType == "" {
-			fmt.Println(a)
-		}
+		fmt.Println(a.CompoundType)
 	}
 }

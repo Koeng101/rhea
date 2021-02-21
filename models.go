@@ -350,7 +350,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					Location:             description.Location.Resource}
 				rhea.Reactions = append(rhea.Reactions, newReaction)
 			case "http://rdf.rhea-db.org/SmallMolecule", "http://rdf.rhea-db.org/Polymer":
-				compoundType := subclass.Resource
+				compoundType := subclass.Resource[23:]
 				newReactivePart := ReactivePart{
 					Id:        description.Id,
 					Accession: description.Accession,
@@ -379,7 +379,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				// Add new reactive parts and new compounds to rhea
 				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
 			case "http://rdf.rhea-db.org/GenericPolypeptide", "http://rdf.rhea-db.org/GenericPolynucleotide", "http://rdf.rhea-db.org/GenericHeteropolysaccharide":
-				compoundType := subclass.Resource
+				compoundType := subclass.Resource[23:]
 				newReactivePart := ReactivePart{
 					CompoundId:        description.Id,
 					CompoundAccession: description.Accession,
