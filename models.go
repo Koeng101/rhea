@@ -221,7 +221,8 @@ The entire structure of Rhea can simply be thought of as:
 	  ReactionParticipants on this side"
 	- There are ReactionParticipants. ReactionParticipants link ReactionSides with ReactiveParts and include
 	  useful information like the number of ReactiveParts (or chemicals) needed to do a certain Reaction.
-	- There are ReactiveParts. These are molecules.
+	- There are ReactiveParts. These are physical molecules represented by Chebis. "CompoundReactionParticipantLink"
+	  links to the "Compound" of a ReactionParticipant
 
 ******************************************************************************/
 
@@ -232,49 +233,49 @@ type Rhea struct {
 }
 
 type ReactivePart struct {
-	Id                  int    `json:"id"`
-	Accession           string `json:"accession"`
-	Position            string `json:"position"`
-	Name                string `json:"name"`
-	HtmlName            string `json:"htmlName"`
-	Formula             string `json:"formula"`
-	Charge              string `json:"charge"`
-	Chebi               string `json:"chebi"`
-	SubclassOfChebi     string `json:"subclassOfChebi"`
-	PolymerizationIndex string `json:"polymerizationIndex"`
-
-	CompoundId        int    `json:"id"`
-	CompoundAccession string `json:"accession"`
-	CompoundName      string `json:"name"`
-	CompoundHtmlName  string `json:"htmlName"`
-	CompoundType      string `json:"compoundType"`
+	Id                              int    `json:"id" db:"id"`
+	Accession                       string `json:"accession" db:"accession"`
+	Position                        string `json:"position" db: "position"`
+	Name                            string `json:"name" db:"name"`
+	HtmlName                        string `json:"htmlName" db:"htmlname"`
+	Formula                         string `json:"formula" db:"formula"`
+	Charge                          string `json:"charge" db:"charge"`
+	Chebi                           string `json:"chebi" db:"chebi"`
+	SubclassOfChebi                 string `json:"subclassOfChebi"`
+	PolymerizationIndex             string `json:"polymerizationIndex" db:"polymerizationindex"`
+	CompoundReactionParticipantLink string `json:"reactionparticipantlink" db:"reactionparticipantlink"`
+	CompoundId                      int    `json:"id" db:"compoundid"`
+	CompoundAccession               string `json:"accession" db:"compoundaccession"`
+	CompoundName                    string `json:"name" db:"compoundname"`
+	CompoundHtmlName                string `json:"htmlName" db:"compoundhtmlname"`
+	CompoundType                    string `json:"compoundType" db:"compoundtype"`
 }
 
 type ReactionParticipant struct {
-	ReactionSide string `json:"reactionside"`
-	Contains     int    `json:"contains"`
-	ContainsN    bool   `json:"containsn"`
-	Minus        bool   `json:"minus"` // Only set to true if ContainsN == true to handle Nminus1
-	Plus         bool   `json:"plus"`  // Only set to true if ContainsN == true to handle Nplus1
-	Compound     string `json:"compound"`
+	ReactionSide string `json:"reactionside" db:"reactionside"`
+	Contains     int    `json:"contains" db:"contains"`
+	ContainsN    bool   `json:"containsn" db:"containsn"`
+	Minus        bool   `json:"minus" db:"minus"` // Only set to true if ContainsN == true to handle Nminus1
+	Plus         bool   `json:"plus" db:"plus"`   // Only set to true if ContainsN == true to handle Nplus1
+	Compound     string `json:"compound" db:"compound"`
 }
 
 type Reaction struct {
-	Id                   int
-	Directional          bool
-	Accession            string
-	Status               string
-	Comment              string
-	Equation             string
-	HtmlEquation         string
-	IsChemicallyBalanced bool
-	IsTransport          bool
-	Ec                   string
+	Id                   int    `json:"id" db:"id"`
+	Directional          bool   `json:"directional" db:"directional"`
+	Accession            string `json:"accession" db:"accession"`
+	Status               string `json:"status" db:"status"`
+	Comment              string `json:"comment" db:"comment"`
+	Equation             string `json:"equation" db:"equation"`
+	HtmlEquation         string `json:"htmlequation" db:"htmlequation"`
+	IsChemicallyBalanced bool   `json:"ischemicallybalanced" db:"ischemicallybalanced"`
+	IsTransport          bool   `json:"istransport" db:"istransport"`
+	Ec                   string `json:"ec" db:"ec"`
+	Location             string `json:"location" db:"location"`
 	Citations            []string
 	Substrates           []string
 	Products             []string
 	SubstrateOrProducts  []string
-	Location             string
 }
 
 /******************************************************************************
@@ -350,11 +351,12 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					Charge:    description.Charge,
 					Chebi:     description.Chebi.Resource,
 
-					CompoundId:        description.Id,
-					CompoundAccession: description.Accession,
-					CompoundName:      description.Name,
-					CompoundHtmlName:  description.HtmlName,
-					CompoundType:      compoundType}
+					CompoundReactionParticipantLink: description.About,
+					CompoundId:                      description.Id,
+					CompoundAccession:               description.Accession,
+					CompoundName:                    description.Name,
+					CompoundHtmlName:                description.HtmlName,
+					CompoundType:                    compoundType}
 				if compoundType == "Polymer" {
 					newReactivePart.Chebi = description.UnderlyingChebi.Resource
 				}
@@ -377,6 +379,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				compoundMap[description.ReactivePartXml.Resource] = newReactivePart
 			case "http://rdf.rhea-db.org/ReactivePart":
 				newReactivePart := compoundMap[description.Accession]
+				newReactivePart.CompoundReactionParticipantLink = description.About
 				newReactivePart.Id = description.Id
 				newReactivePart.Accession = description.Accession
 				newReactivePart.Position = description.Position
