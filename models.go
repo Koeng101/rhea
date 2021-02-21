@@ -418,7 +418,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         false,
-						Accession:    containsx.Content}
+						Accession:    compoundParticipantMap[containsx.Content]}
 				case "contains2n":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -426,7 +426,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         false,
-						Accession:    containsx.Content}
+						Accession:    compoundParticipantMap[containsx.Content]}
 				case "containsNminus1":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -434,7 +434,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        true,
 						Plus:         false,
-						Accession:    containsx.Content}
+						Accession:    compoundParticipantMap[containsx.Content]}
 				case "containsNplus1":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -442,7 +442,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         true,
-						Accession:    containsx.Content}
+						Accession:    compoundParticipantMap[containsx.Content]}
 				default:
 					i, err := strconv.Atoi(containsx.XMLName.Local[8:])
 					if err != nil {
@@ -454,7 +454,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    false,
 						Minus:        false,
 						Plus:         false,
-						Accession:    containsx.Content}
+						Accession:    compoundParticipantMap[containsx.Content]}
 				}
 				rhea.ReactionParticipants = append(rhea.ReactionParticipants, newReactionParticipant)
 			}
