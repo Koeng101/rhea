@@ -466,7 +466,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				if ok != true {
 					return Rhea{}, errors.New("Could not find " + description.About)
 				}
-				newReactivePart.CompoundReactionParticipantLink = description.About
+				newReactivePart.CompoundReactionParticipantLink = compoundMap[description.About]
 				newReactivePart.Id = description.Id
 				newReactivePart.Accession = description.Accession
 				newReactivePart.Position = description.Position
