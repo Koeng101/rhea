@@ -3,6 +3,7 @@ package rhea
 import (
 	"compress/gzip"
 	"encoding/xml"
+	"errors"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -298,9 +299,18 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 
 	// Initialize Rhea
 	var rhea Rhea
-	compoundMap := make(map[string]ReactivePart)
+	compoundMap := make(map[string]string)
+	reactivePartMap := make(map[string]ReactivePart)
 
 	for _, description := range rdf.Descriptions {
+		// Handle the case of a single compound -> reactive part, such as
+		// <rdf:Description rdf:about="http://rdf.rhea-db.org/Compound_10594">
+		// 	<rh:reactivePart rdf:resource="http://rdf.rhea-db.org/Compound_10594_rp2"/>
+		// </rdf:Description>
+		if (len(description.Subclass) == 0) && (description.ReactivePartXml.Resource != "") {
+			compoundMap[description.ReactivePartXml.Resource] = description.About
+		}
+
 		for _, subclass := range description.Subclass {
 			switch subclass.Resource {
 			case "http://rdf.rhea-db.org/DirectionalReaction":
@@ -340,7 +350,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					Location:             description.Location.Resource}
 				rhea.Reactions = append(rhea.Reactions, newReaction)
 			case "http://rdf.rhea-db.org/SmallMolecule", "http://rdf.rhea-db.org/Polymer":
-				compoundType := subclass.Resource[23:]
+				compoundType := subclass.Resource
 				newReactivePart := ReactivePart{
 					Id:        description.Id,
 					Accession: description.Accession,
@@ -369,26 +379,15 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				// Add new reactive parts and new compounds to rhea
 				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
 			case "http://rdf.rhea-db.org/GenericPolypeptide", "http://rdf.rhea-db.org/GenericPolynucleotide", "http://rdf.rhea-db.org/GenericHeteropolysaccharide":
-				compoundType := subclass.Resource[23:]
+				compoundType := subclass.Resource
 				newReactivePart := ReactivePart{
 					CompoundId:        description.Id,
 					CompoundAccession: description.Accession,
 					CompoundName:      description.Name,
 					CompoundHtmlName:  description.HtmlName,
 					CompoundType:      compoundType}
-				compoundMap[description.ReactivePartXml.Resource] = newReactivePart
-			case "http://rdf.rhea-db.org/ReactivePart":
-				newReactivePart := compoundMap[description.Accession]
-				newReactivePart.CompoundReactionParticipantLink = description.About
-				newReactivePart.Id = description.Id
-				newReactivePart.Accession = description.Accession
-				newReactivePart.Position = description.Position
-				newReactivePart.Name = description.Name
-				newReactivePart.HtmlName = description.HtmlName
-				newReactivePart.Formula = description.Formula
-				newReactivePart.Charge = description.Charge
-				newReactivePart.Chebi = description.Chebi.Resource
-				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
+				reactivePartMap[description.About] = newReactivePart
+				compoundMap[description.ReactivePartXml.Resource] = description.About
 			}
 		}
 		for _, containsx := range description.ContainsX {
@@ -444,6 +443,29 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						Compound:     containsx.Content}
 				}
 				rhea.ReactionParticipants = append(rhea.ReactionParticipants, newReactionParticipant)
+			}
+		}
+	}
+
+	// Go back and get the ReactiveParts
+	for _, description := range rdf.Descriptions {
+		for _, subclass := range description.Subclass {
+			switch subclass.Resource {
+			case "http://rdf.rhea-db.org/ReactivePart":
+				newReactivePart, ok := reactivePartMap[compoundMap[description.About]]
+				if ok != true {
+					return Rhea{}, errors.New("Could not find " + description.About)
+				}
+				newReactivePart.CompoundReactionParticipantLink = description.About
+				newReactivePart.Id = description.Id
+				newReactivePart.Accession = description.Accession
+				newReactivePart.Position = description.Position
+				newReactivePart.Name = description.Name
+				newReactivePart.HtmlName = description.HtmlName
+				newReactivePart.Formula = description.Formula
+				newReactivePart.Charge = description.Charge
+				newReactivePart.Chebi = description.Chebi.Resource
+				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
 			}
 		}
 	}
