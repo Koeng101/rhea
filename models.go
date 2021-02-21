@@ -44,6 +44,7 @@ type Description struct {
 	Comment              string               `xml:"comment"`
 	EC                   EC                   `xml:"ec"`
 	Status               Status               `xml:"status"`
+	Compound             CompoundXml          `xml:"compound"`
 
 	// ReactionSide / Reaction Participant
 	BidirectionalReactions []BidirectionalReaction `xml:"bidirectionalReaction"`
@@ -142,6 +143,11 @@ type EC struct {
 
 type Status struct {
 	XMLName  xml.Name `xml:"status"`
+	Resource string   `xml:"resource,attr"`
+}
+
+type CompoundXml struct {
+	XMLName  xml.Name `xml:"compound"`
 	Resource string   `xml:"resource,attr"`
 }
 
@@ -310,6 +316,9 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 		if (len(description.Subclass) == 0) && (description.ReactivePartXml.Resource != "") {
 			compoundMap[description.ReactivePartXml.Resource] = description.About
 		}
+		if description.Compound.Resource != "" {
+			compoundMap[description.About] = description.Compound.Resource
+		}
 
 		for _, subclass := range description.Subclass {
 			switch subclass.Resource {
@@ -390,6 +399,10 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				compoundMap[description.ReactivePartXml.Resource] = description.About
 			}
 		}
+	}
+
+	// Go back and get the ReactiveParts
+	for _, description := range rdf.Descriptions {
 		for _, containsx := range description.ContainsX {
 			if strings.Contains(containsx.XMLName.Local, "contains") {
 				// Get reaction sides
@@ -404,7 +417,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         false,
-						Compound:     containsx.Content}
+						Compound:     compoundMap[containsx.Content]}
 				case "contains2n":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -412,7 +425,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         false,
-						Compound:     containsx.Content}
+						Compound:     compoundMap[containsx.Content]}
 				case "containsNminus1":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -420,7 +433,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        true,
 						Plus:         false,
-						Compound:     containsx.Content}
+						Compound:     compoundMap[containsx.Content]}
 				case "containsNplus1":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -428,7 +441,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         true,
-						Compound:     containsx.Content}
+						Compound:     compoundMap[containsx.Content]}
 				default:
 					i, err := strconv.Atoi(containsx.XMLName.Local[8:])
 					if err != nil {
@@ -440,15 +453,12 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    false,
 						Minus:        false,
 						Plus:         false,
-						Compound:     containsx.Content}
+						Compound:     compoundMap[containsx.Content]}
 				}
 				rhea.ReactionParticipants = append(rhea.ReactionParticipants, newReactionParticipant)
 			}
 		}
-	}
 
-	// Go back and get the ReactiveParts
-	for _, description := range rdf.Descriptions {
 		for _, subclass := range description.Subclass {
 			switch subclass.Resource {
 			case "http://rdf.rhea-db.org/ReactivePart":

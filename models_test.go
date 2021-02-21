@@ -16,6 +16,15 @@ func TestParse(t *testing.T) {
 	}
 	//r := rhea.ReactionParticipants[100].Compound
 	for _, a := range rhea.ReactiveParts {
-		fmt.Println(a.CompoundType)
+		if a.CompoundReactionParticipantLink == "http://rdf.rhea-db.org/Participant_10000_compound_1283" {
+			fmt.Println(a)
+		}
+	}
+	for _, b := range rhea.ReactionParticipants[100:110] {
+		fmt.Println(b.Compound)
+	}
+
+	for _, c := range rhea.ReactiveParts[100:105] {
+		fmt.Println(c)
 	}
 }
