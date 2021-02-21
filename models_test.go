@@ -19,7 +19,10 @@ func TestParse(t *testing.T) {
 	//	fmt.Println(k)
 	//	fmt.Println(v)
 	//}
-	for _, c := range rhea.ReactionParticipants {
-		fmt.Println(c)
+	for _, c := range rhea.Compounds {
+		if c.Accession == "http://rdf.rhea-db.org/Compound_10594" {
+			fmt.Println(c)
+		}
 	}
+	//fmt.Println(rhea.ReactionParticipantToCompoundMap["http://rdf.rhea-db.org/Participant_10000_compound_1283"])
 }

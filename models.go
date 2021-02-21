@@ -391,11 +391,11 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 			case "http://rdf.rhea-db.org/GenericPolypeptide", "http://rdf.rhea-db.org/GenericPolynucleotide", "http://rdf.rhea-db.org/GenericHeteropolysaccharide":
 				compoundType := subclass.Resource[23:]
 				newCompound := Compound{
-					CompoundId:        description.Id,
-					CompoundAccession: description.Accession,
-					CompoundName:      description.Name,
-					CompoundHtmlName:  description.HtmlName,
-					CompoundType:      compoundType}
+					Accession:        description.About,
+					CompoundId:       description.Id,
+					CompoundName:     description.Name,
+					CompoundHtmlName: description.HtmlName,
+					CompoundType:     compoundType}
 				compoundMap[description.About] = newCompound
 				compoundParticipantMap[description.ReactivePartXml.Resource] = description.About
 			}
@@ -468,7 +468,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					return Rhea{}, errors.New("Could not find " + description.About)
 				}
 				newCompound.Id = description.Id
-				newCompound.Accession = description.About
+				newCompound.CompoundAccession = description.About
 				newCompound.Position = description.Position
 				newCompound.Name = description.Name
 				newCompound.HtmlName = description.HtmlName
