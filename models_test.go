@@ -14,17 +14,15 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to ParseRhea. Got error: %w", err)
 	}
-	//r := rhea.ReactionParticipants[100].Compound
-	for _, a := range rhea.ReactiveParts {
-		if a.CompoundReactionParticipantLink == "http://rdf.rhea-db.org/Compound_10594" {
-			fmt.Println(a)
-		}
-	}
 	//for _, b := range rhea.ReactionParticipants[100:110] {
 	//	fmt.Println(b.Compound)
 	//}
 
-	for _, c := range rhea.ReactiveParts[100:105] {
-		fmt.Println(c.CompoundReactionParticipantLink)
+	//for k, v := range rhea.CompoundToReactionParticipantsMap {
+	//	fmt.Println(k)
+	//	fmt.Println(v)
+	//}
+	for _, b := range rhea.ReactionParticipants[100:110] {
+		fmt.Println(b)
 	}
 }

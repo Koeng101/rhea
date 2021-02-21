@@ -214,9 +214,10 @@ These structs are what you would put into a database or directly use. In order t
 create a tree or insert into a normalized database, you would insert in the following
 order:
 
-	- ReactivePart
+	- Compound
 	- ReactiveSide (derived from ReactionParticipant/Reaction)
 	- ReactionParticipant
+	- ReactionParticipant to Compound
 	- Reaction
 
 The entire structure of Rhea can simply be thought of as:
@@ -228,34 +229,35 @@ The entire structure of Rhea can simply be thought of as:
 	  ReactionParticipants on this side"
 	- There are ReactionParticipants. ReactionParticipants link ReactionSides with ReactiveParts and include
 	  useful information like the number of ReactiveParts (or chemicals) needed to do a certain Reaction.
-	- There are ReactiveParts. These are physical molecules represented by Chebis. "CompoundReactionParticipantLink"
-	  links to the "Compound" of a ReactionParticipant
+	- There are ReactiveParts. These are physical molecules represented by Chebis.
+	- Finally, there is the ReactionParticipant to Compound map, which links the key
+	  ReactionParticipant.Accession to Compound.Accession
 
 ******************************************************************************/
 
 type Rhea struct {
-	ReactionParticipants []ReactionParticipant `json:"reactionParticipants"`
-	ReactiveParts        []ReactivePart        `json:"reactiveParts"`
-	Reactions            []Reaction            `json:"reactions"`
+	ReactionParticipants             []ReactionParticipant `json:"reactionParticipants"`
+	Compounds                        []Compound            `json:"compounds"`
+	Reactions                        []Reaction            `json:"reactions"`
+	ReactionParticipantToCompoundMap map[string]string     `json:"reactionParticipantsToCompoundMap"`
 }
 
-type ReactivePart struct {
-	Id                              int    `json:"id" db:"id"`
-	Accession                       string `json:"accession" db:"accession"`
-	Position                        string `json:"position" db: "position"`
-	Name                            string `json:"name" db:"name"`
-	HtmlName                        string `json:"htmlName" db:"htmlname"`
-	Formula                         string `json:"formula" db:"formula"`
-	Charge                          string `json:"charge" db:"charge"`
-	Chebi                           string `json:"chebi" db:"chebi"`
-	SubclassOfChebi                 string `json:"subclassOfChebi"`
-	PolymerizationIndex             string `json:"polymerizationIndex" db:"polymerizationindex"`
-	CompoundReactionParticipantLink string `json:"reactionparticipantlink" db:"reactionparticipantlink"`
-	CompoundId                      int    `json:"id" db:"compoundid"`
-	CompoundAccession               string `json:"accession" db:"compoundaccession"`
-	CompoundName                    string `json:"name" db:"compoundname"`
-	CompoundHtmlName                string `json:"htmlName" db:"compoundhtmlname"`
-	CompoundType                    string `json:"compoundType" db:"compoundtype"`
+type Compound struct {
+	Id                  int    `json:"id" db:"id"`
+	Accession           string `json:"accession" db:"accession"`
+	Position            string `json:"position" db: "position"`
+	Name                string `json:"name" db:"name"`
+	HtmlName            string `json:"htmlName" db:"htmlname"`
+	Formula             string `json:"formula" db:"formula"`
+	Charge              string `json:"charge" db:"charge"`
+	Chebi               string `json:"chebi" db:"chebi"`
+	SubclassOfChebi     string `json:"subclassOfChebi"`
+	PolymerizationIndex string `json:"polymerizationIndex" db:"polymerizationindex"`
+	CompoundId          int    `json:"id" db:"compoundid"`
+	CompoundAccession   string `json:"accession" db:"compoundaccession"`
+	CompoundName        string `json:"name" db:"compoundname"`
+	CompoundHtmlName    string `json:"htmlName" db:"compoundhtmlname"`
+	CompoundType        string `json:"compoundType" db:"compoundtype"`
 }
 
 type ReactionParticipant struct {
@@ -264,7 +266,7 @@ type ReactionParticipant struct {
 	ContainsN    bool   `json:"containsn" db:"containsn"`
 	Minus        bool   `json:"minus" db:"minus"` // Only set to true if ContainsN == true to handle Nminus1
 	Plus         bool   `json:"plus" db:"plus"`   // Only set to true if ContainsN == true to handle Nplus1
-	Compound     string `json:"compound" db:"compound"`
+	Accession    string `json:"reactionParticipant" db:"ReactionParticipant"`
 }
 
 type Reaction struct {
@@ -305,8 +307,8 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 
 	// Initialize Rhea
 	var rhea Rhea
-	compoundMap := make(map[string]string)
-	reactivePartMap := make(map[string]ReactivePart)
+	compoundParticipantMap := make(map[string]string)
+	compoundMap := make(map[string]Compound)
 
 	for _, description := range rdf.Descriptions {
 		// Handle the case of a single compound -> reactive part, such as
@@ -314,10 +316,10 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 		// 	<rh:reactivePart rdf:resource="http://rdf.rhea-db.org/Compound_10594_rp2"/>
 		// </rdf:Description>
 		if (len(description.Subclass) == 0) && (description.ReactivePartXml.Resource != "") {
-			compoundMap[description.ReactivePartXml.Resource] = description.About
+			compoundParticipantMap[description.ReactivePartXml.Resource] = description.About
 		}
 		if description.Compound.Resource != "" {
-			compoundMap[description.About] = description.Compound.Resource
+			compoundParticipantMap[description.About] = description.Compound.Resource
 		}
 
 		for _, subclass := range description.Subclass {
@@ -360,7 +362,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				rhea.Reactions = append(rhea.Reactions, newReaction)
 			case "http://rdf.rhea-db.org/SmallMolecule", "http://rdf.rhea-db.org/Polymer":
 				compoundType := subclass.Resource[23:]
-				newReactivePart := ReactivePart{
+				newCompound := Compound{
 					Id:        description.Id,
 					Accession: description.Accession,
 					Position:  description.Position,
@@ -370,33 +372,32 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					Charge:    description.Charge,
 					Chebi:     description.Chebi.Resource,
 
-					CompoundReactionParticipantLink: description.About,
-					CompoundId:                      description.Id,
-					CompoundAccession:               description.Accession,
-					CompoundName:                    description.Name,
-					CompoundHtmlName:                description.HtmlName,
-					CompoundType:                    compoundType}
-				if compoundType == "Polymer" {
-					newReactivePart.Chebi = description.UnderlyingChebi.Resource
-				}
-				// Add subclass Chebi
-				for _, sc := range description.Subclass {
-					if strings.Contains(sc.Resource, "CHEBI") {
-						newReactivePart.SubclassOfChebi = sc.Resource
-					}
-				}
-				// Add new reactive parts and new compounds to rhea
-				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
-			case "http://rdf.rhea-db.org/GenericPolypeptide", "http://rdf.rhea-db.org/GenericPolynucleotide", "http://rdf.rhea-db.org/GenericHeteropolysaccharide":
-				compoundType := subclass.Resource[23:]
-				newReactivePart := ReactivePart{
 					CompoundId:        description.Id,
 					CompoundAccession: description.Accession,
 					CompoundName:      description.Name,
 					CompoundHtmlName:  description.HtmlName,
 					CompoundType:      compoundType}
-				reactivePartMap[description.About] = newReactivePart
-				compoundMap[description.ReactivePartXml.Resource] = description.About
+				if compoundType == "Polymer" {
+					newCompound.Chebi = description.UnderlyingChebi.Resource
+				}
+				// Add subclass Chebi
+				for _, sc := range description.Subclass {
+					if strings.Contains(sc.Resource, "CHEBI") {
+						newCompound.SubclassOfChebi = sc.Resource
+					}
+				}
+				// Add new reactive parts and new compounds to rhea
+				rhea.Compounds = append(rhea.Compounds, newCompound)
+			case "http://rdf.rhea-db.org/GenericPolypeptide", "http://rdf.rhea-db.org/GenericPolynucleotide", "http://rdf.rhea-db.org/GenericHeteropolysaccharide":
+				compoundType := subclass.Resource[23:]
+				newCompound := Compound{
+					CompoundId:        description.Id,
+					CompoundAccession: description.Accession,
+					CompoundName:      description.Name,
+					CompoundHtmlName:  description.HtmlName,
+					CompoundType:      compoundType}
+				compoundMap[description.About] = newCompound
+				compoundParticipantMap[description.ReactivePartXml.Resource] = description.About
 			}
 		}
 	}
@@ -417,7 +418,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         false,
-						Compound:     compoundMap[containsx.Content]}
+						Accession:    containsx.Content}
 				case "contains2n":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -425,7 +426,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         false,
-						Compound:     compoundMap[containsx.Content]}
+						Accession:    containsx.Content}
 				case "containsNminus1":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -433,7 +434,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        true,
 						Plus:         false,
-						Compound:     compoundMap[containsx.Content]}
+						Accession:    containsx.Content}
 				case "containsNplus1":
 					newReactionParticipant = ReactionParticipant{
 						ReactionSide: description.About,
@@ -441,7 +442,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    true,
 						Minus:        false,
 						Plus:         true,
-						Compound:     compoundMap[containsx.Content]}
+						Accession:    containsx.Content}
 				default:
 					i, err := strconv.Atoi(containsx.XMLName.Local[8:])
 					if err != nil {
@@ -453,7 +454,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 						ContainsN:    false,
 						Minus:        false,
 						Plus:         false,
-						Compound:     compoundMap[containsx.Content]}
+						Accession:    containsx.Content}
 				}
 				rhea.ReactionParticipants = append(rhea.ReactionParticipants, newReactionParticipant)
 			}
@@ -462,23 +463,24 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 		for _, subclass := range description.Subclass {
 			switch subclass.Resource {
 			case "http://rdf.rhea-db.org/ReactivePart":
-				newReactivePart, ok := reactivePartMap[compoundMap[description.About]]
+				newCompound, ok := compoundMap[compoundParticipantMap[description.About]]
 				if ok != true {
 					return Rhea{}, errors.New("Could not find " + description.About)
 				}
-				newReactivePart.CompoundReactionParticipantLink = compoundMap[description.About]
-				newReactivePart.Id = description.Id
-				newReactivePart.Accession = description.Accession
-				newReactivePart.Position = description.Position
-				newReactivePart.Name = description.Name
-				newReactivePart.HtmlName = description.HtmlName
-				newReactivePart.Formula = description.Formula
-				newReactivePart.Charge = description.Charge
-				newReactivePart.Chebi = description.Chebi.Resource
-				rhea.ReactiveParts = append(rhea.ReactiveParts, newReactivePart)
+				newCompound.Id = description.Id
+				newCompound.Accession = description.Accession
+				newCompound.Position = description.Position
+				newCompound.Name = description.Name
+				newCompound.HtmlName = description.HtmlName
+				newCompound.Formula = description.Formula
+				newCompound.Charge = description.Charge
+				newCompound.Chebi = description.Chebi.Resource
+				rhea.Compounds = append(rhea.Compounds, newCompound)
 			}
 		}
 	}
+	// Set CompoundToReactionParticipantsMap
+	rhea.ReactionParticipantToCompoundMap = compoundParticipantMap
 	return rhea, nil
 }
 
