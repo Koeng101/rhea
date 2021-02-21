@@ -2,7 +2,6 @@ package rhea
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -17,14 +16,10 @@ func TestParse(t *testing.T) {
 	}
 
 	//for k, v := range rhea.ReactionParticipantToCompoundMap {
-	//	if k == "http://rdf.rhea-db.org/Participant_10008_compound_10594" {
-	//		fmt.Println(k)
-	//		fmt.Println(v)
-	//	}
+	//	fmt.Println(k)
+	//	fmt.Println(v)
 	//}
-	for _, c := range rhea.Compounds {
-		if strings.Contains(c.Accession, "http://rdf.rhea-db.org/Participant_10000_compound_1283") {
-			fmt.Println(c)
-		}
+	for _, c := range rhea.ReactionParticipants {
+		fmt.Println(c)
 	}
 }
