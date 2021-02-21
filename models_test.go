@@ -18,11 +18,13 @@ func TestParse(t *testing.T) {
 	//	fmt.Println(b.Compound)
 	//}
 
-	//for k, v := range rhea.CompoundToReactionParticipantsMap {
-	//	fmt.Println(k)
-	//	fmt.Println(v)
-	//}
-	for _, b := range rhea.ReactionParticipants[100:110] {
-		fmt.Println(b)
+	for k, v := range rhea.ReactionParticipantToCompoundMap {
+		fmt.Println(k)
+		fmt.Println(v)
+	}
+	for _, c := range rhea.Compounds {
+		if c.CompoundAccession == "GENERIC:10594" {
+			fmt.Println(c)
+		}
 	}
 }

@@ -364,7 +364,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 				compoundType := subclass.Resource[23:]
 				newCompound := Compound{
 					Id:        description.Id,
-					Accession: description.Accession,
+					Accession: description.About,
 					Position:  description.Position,
 					Name:      description.Name,
 					HtmlName:  description.HtmlName,
@@ -468,7 +468,7 @@ func ParseRhea(rheaBytes []byte) (Rhea, error) {
 					return Rhea{}, errors.New("Could not find " + description.About)
 				}
 				newCompound.Id = description.Id
-				newCompound.Accession = description.Accession
+				newCompound.Accession = description.About
 				newCompound.Position = description.Position
 				newCompound.Name = description.Name
 				newCompound.HtmlName = description.HtmlName
